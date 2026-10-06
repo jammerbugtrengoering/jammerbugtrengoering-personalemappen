@@ -219,10 +219,13 @@ function DokumenterSide({ dok }) {
 }
 
 // ── Forside ─────────────────────────────────────────────────────────────────
-function Forside({ navn, dok, kvit, datoer, gaaTil }) {
+function Forside({ navn, dok, kvit, datoer, musData, gaaTil }) {
   const fornavn = (navn || "").split(" ")[0];
   const venter = (dok.dokumenter || []).filter((d) => d.kvittering_kraeves && !d.kvitteret_tid);
   const haandbogVenter = (kvit.liste || []).filter((h) => !h.kvitteret_tid);
+  // Et referat venter paa hende, naar lederen har sendt det og hun ikke har svaret.
+  const referatVenter = (musData?.mus || []).filter((m) => m.referat_status === "sendt");
+  const antalVenter = venter.length + haandbogVenter.length + referatVenter.length;
   const snart = new Date(Date.now() + 120 * 864e5).toISOString().slice(0, 10);
   const naeste = [];
   if (datoer?.mus_naeste && datoer.mus_naeste >= idagIso()) naeste.push({ tekst: "Medarbejdersamtale (MUS)", dato: datoer.mus_naeste, advarsel: false });
@@ -238,11 +241,17 @@ function Forside({ navn, dok, kvit, datoer, gaaTil }) {
       <div style={s.kort}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={s.h2}>Venter på dig</div>
-          {venter.length + haandbogVenter.length > 0 && <div style={{ background: FARVE_LYS, color: FARVE_MOERK, fontWeight: 700, fontSize: 13.5, borderRadius: 999, padding: "2px 10px" }}>{venter.length + haandbogVenter.length} {venter.length + haandbogVenter.length === 1 ? "ny" : "nye"}</div>}
+          {antalVenter > 0 && <div style={{ background: FARVE_LYS, color: FARVE_MOERK, fontWeight: 700, fontSize: 13.5, borderRadius: 999, padding: "2px 10px" }}>{antalVenter} {antalVenter === 1 ? "ny" : "nye"}</div>}
         </div>
-        {venter.length + haandbogVenter.length === 0
+        {antalVenter === 0
           ? <div style={{ ...s.dempet, marginTop: 8 }}>Der er ikke noget, du skal kvittere for.</div>
-          : <>{haandbogVenter.map((h) => (
+          : <>{referatVenter.map((m) => (
+            <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderTop: `1px solid ${RAMME}`, marginTop: 8 }}>
+              <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600 }}>Referat fra din MUS</div><div style={s.dempet}>Skal læses og godkendes</div></div>
+              <button type="button" style={s.knap} onClick={() => gaaTil("udvikling")}>Åbn</button>
+            </div>
+          ))}
+          {haandbogVenter.map((h) => (
             <div key={h.dokument_id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderTop: `1px solid ${RAMME}`, marginTop: 8 }}>
               <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600, wordBreak: "break-word" }}>{h.titel}</div><div style={s.dempet}>Skal læses og kvitteres{h.version > 1 ? " (ny version)" : ""}</div></div>
               <button type="button" style={s.knap} onClick={() => gaaTil("haandbog")}>Åbn</button>
@@ -352,7 +361,7 @@ function Mig({ navn, datoer, onLogUd }) {
         <div style={s.dempet}>
           Dokumenterne i din personalemappe kan kun ses af dig og af de få personer på kontoret, der har adgang til personalemapperne. Du kan se, hvornår du
           har kvitteret for et dokument. Dine ændringer af telefon og nødkontakt gemmes hos os, og kontoret kan se dem. Nødkontakten bruges kun, hvis der sker dig noget.
-          Dine anmodninger om ferie og fri kan kontoret se. Det, du skriver til din MUS, kan kun du se, til du trykker «Del med kontoret». Dine ønsker om kurser
+          Dine anmodninger om ferie og fri kan kontoret se. Det, du skriver til din MUS, kan kun du se, til du trykker «Del med kontoret». Referatet fra din MUS skrives af din leder, og du godkender det eller skriver en bemærkning; leder og kontoret kan se referatet og din bemærkning. Dine ønsker om kurser
           og udvikling kan kontoret se.
         </div>
       </div>
@@ -363,6 +372,19 @@ function Mig({ navn, datoer, onLogUd }) {
 }
 
 // Håndbogsdokumenter, hun skal kvittere for, og om hun har kvitteret for den nuværende version (mine_haandbog_kvittering). En ny version kræver en ny kvittering.
+// Samtaler og referater. Ligger i Skal, saa forsiden kan vise «referat venter paa dig» uden at hun har aabnet Udvikling.
+function useMus() {
+  const [mus, setMus] = useState(null);
+  const [fejl, setFejl] = useState("");
+  const hent = useCallback(async () => {
+    const { data, error } = await supabase.rpc("min_mus_samtaler");
+    if (error) { setFejl("Samtalerne kunne ikke hentes: " + error.message); setMus([]); return; }
+    setFejl(""); setMus(data || []);
+  }, []);
+  useEffect(() => { hent(); }, [hent]);
+  return { mus, fejl, hent };
+}
+
 function useHaandbogKvittering() {
   const [liste, setListe] = useState(null);
   const hent = useCallback(async () => {
@@ -595,8 +617,54 @@ function MusKort({ m, onGemt }) {
   );
 }
 
-function UdviklingSide({ dok }) {
-  const [mus, setMus] = useState(null);
+// Referatet skrives af lederen i Worklist og sendes hertil. Hun godkender det eller skriver en bemaerkning, og lederen retter og sender igen.
+// Et godkendt referat er laast i databasen.
+function ReferatKort({ m, onSvar }) {
+  const [bem, setBem] = useState("");
+  const [vis, setVis] = useState(false);
+  const [arbejder, setArbejder] = useState("");
+  const [fejl, setFejl] = useState("");
+  const kanSvare = m.referat_status === "sendt";
+
+  async function svar(godkend) {
+    setArbejder(godkend ? "ok" : "bem"); setFejl("");
+    const { error } = await supabase.rpc("svar_mus_referat", { p_id: m.id, p_godkend: godkend, p_bemaerkning: godkend ? null : bem });
+    setArbejder("");
+    if (error) { setFejl(error.message); return; }
+    setVis(false); setBem(""); onSvar();
+  }
+
+  return (
+    <div style={s.kort}>
+      <div style={s.h2}>Referat fra MUS</div>
+      <div style={s.dempet}>{kortDato(m.afholdt_dato || m.dato)}{m.leder_navn ? ` · med ${m.leder_navn}` : ""}</div>
+      <div style={{ whiteSpace: "pre-line", overflowWrap: "anywhere", marginTop: 10, lineHeight: 1.55 }}>{m.referat}</div>
+      {m.referat_status === "godkendt" && <div style={{ color: "#1B7A46", fontWeight: 700, marginTop: 12 }}>Du godkendte referatet {kortDato(m.referat_godkendt_tid)}.</div>}
+      {m.referat_status === "bemaerkning" && (<>
+        <div style={{ color: "#B45309", fontWeight: 700, marginTop: 12 }}>Du har sendt en bemærkning. Din leder retter referatet.</div>
+        {m.medarbejder_bemaerkning && <div style={{ ...s.dempet, marginTop: 4, whiteSpace: "pre-line" }}>{m.medarbejder_bemaerkning}</div>}
+      </>)}
+      {fejl && <div style={s.fejl}>{fejl}</div>}
+      {kanSvare && !vis && (
+        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+          <button type="button" style={{ ...s.knapLys, flex: 1 }} disabled={!!arbejder} onClick={() => setVis(true)}>Jeg har bemærkninger</button>
+          <button type="button" style={{ ...s.knap, flex: 1 }} disabled={!!arbejder} onClick={() => svar(true)}>{arbejder === "ok" ? "Gemmer…" : "Godkend referatet"}</button>
+        </div>
+      )}
+      {kanSvare && vis && (<>
+        <label htmlFor={`bem-${m.id}`} style={s.label}>Hvad er forkert eller mangler?</label>
+        <textarea id={`bem-${m.id}`} rows={3} maxLength={1000} style={{ ...s.felt, minHeight: 84, padding: 10, lineHeight: 1.5 }} value={bem} onChange={(e) => setBem(e.target.value)} />
+        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+          <button type="button" style={{ ...s.knapLys, flex: 1 }} disabled={!!arbejder} onClick={() => setVis(false)}>Annuller</button>
+          <button type="button" style={{ ...s.knap, flex: 1, opacity: bem.trim() ? 1 : 0.5 }} disabled={!!arbejder || !bem.trim()} onClick={() => svar(false)}>{arbejder === "bem" ? "Sender…" : "Send bemærkning"}</button>
+        </div>
+      </>)}
+    </div>
+  );
+}
+
+function UdviklingSide({ dok, musData }) {
+  const { mus, fejl: musFejl, hent: hentMus } = musData;
   const [komp, setKomp] = useState(null);
   const [oensker, setOensker] = useState(null);
   const [tekst, setTekst] = useState("");
@@ -604,9 +672,9 @@ function UdviklingSide({ dok }) {
   const [arbejder, setArbejder] = useState(false);
 
   const hent = useCallback(async () => {
-    const [a, b, c] = await Promise.all([supabase.rpc("min_mus"), supabase.rpc("mine_kompetencer"), supabase.rpc("mine_udviklingsoensker")]);
-    if (a.error || b.error || c.error) setFejl("Noget kunne ikke hentes: " + (a.error || b.error || c.error).message);
-    setMus(a.data || []); setKomp(b.data || []); setOensker(c.data || []);
+    const [b, c] = await Promise.all([supabase.rpc("mine_kompetencer"), supabase.rpc("mine_udviklingsoensker")]);
+    if (b.error || c.error) setFejl("Noget kunne ikke hentes: " + (b.error || c.error).message);
+    setKomp(b.data || []); setOensker(c.data || []);
   }, []);
   useEffect(() => { hent(); }, [hent]);
 
@@ -626,15 +694,17 @@ function UdviklingSide({ dok }) {
   const beviser = (dok.dokumenter || []).filter((d) => d.kategori === "certifikat");
   const planlagte = (mus || []).filter((m) => m.status === "planlagt");
   const afholdte = (mus || []).filter((m) => m.status === "afholdt");
+  const medReferat = afholdte.filter((m) => m.referat);
 
   return (
     <>
       <div><h1 style={s.h1}>Udvikling</h1>
         <div style={s.dempet}>Din MUS, det du kan, og det du gerne vil lære.</div></div>
-      {fejl && <div style={s.fejl}>{fejl}</div>}
+      {(fejl || musFejl) && <div style={s.fejl}>{fejl || musFejl}</div>}
 
       {mus === null && <div style={s.dempet}>Henter…</div>}
-      {planlagte.map((m) => <MusKort key={m.id} m={m} onGemt={hent} />)}
+      {medReferat.map((m) => <ReferatKort key={m.id} m={m} onSvar={hentMus} />)}
+      {planlagte.map((m) => <MusKort key={m.id} m={m} onGemt={hentMus} />)}
       {mus && planlagte.length === 0 && (
         <div style={s.kort}><div style={s.h2}>Din næste MUS</div><div style={{ ...s.dempet, marginTop: 4 }}>Der er ikke booket en samtale endnu. Når kontoret gør det, står den her, og du kan forberede dig.</div></div>
       )}
@@ -642,7 +712,7 @@ function UdviklingSide({ dok }) {
         <div style={s.kort}>
           <div style={s.h2}>Tidligere samtaler</div>
           {afholdte.map((m) => <div key={m.id} style={{ marginTop: 6 }}>{kortDato(m.afholdt_dato || m.dato)}{m.leder_navn ? <span style={s.dempet}> · med {m.leder_navn}</span> : null}</div>)}
-          <div style={{ ...s.dempet, marginTop: 6 }}>Referatet ligger under Dokumenter, hvis kontoret har lagt det ind til dig.</div>
+          <div style={{ ...s.dempet, marginTop: 6 }}>Referatet fra din leder står øverst på siden, når det er sendt til dig. Ældre referater kan ligge under Dokumenter.</div>
         </div>
       )}
 
@@ -745,6 +815,7 @@ function Skal({ session }) {
   const [adgangFejl, setAdgangFejl] = useState("");
   const dok = useDokumenter();
   const kvit = useHaandbogKvittering();
+  const musData = useMus();
 
   useEffect(() => {
     let afbrudt = false;
@@ -773,10 +844,10 @@ function Skal({ session }) {
   };
 
   const indhold = adgangFejl ? <div style={s.kort}>{adgangFejl}</div>
-    : side === "forside" ? <Forside navn={navn} dok={dok} kvit={kvit} datoer={datoer} gaaTil={setSide} />
+    : side === "forside" ? <Forside navn={navn} dok={dok} kvit={kvit} datoer={datoer} musData={musData} gaaTil={setSide} />
     : side === "dokumenter" ? <DokumenterSide dok={dok} />
     : side === "ferie" ? <FerieSide />
-    : side === "udvikling" ? <UdviklingSide dok={dok} />
+    : side === "udvikling" ? <UdviklingSide dok={dok} musData={musData} />
     : side === "mere" ? <Mere gaaTil={setSide} />
     : side === "haandbog" ? <HaandbogSide kvit={kvit} />
     : <Mig navn={navn} datoer={datoer} onLogUd={() => supabase.auth.signOut()} />;
@@ -785,8 +856,9 @@ function Skal({ session }) {
     // Antal, der venter på hende, vises som et tal ved menupunktet (som «Påmindelser» i mockuppen).
     const ventendeDok = (dok.dokumenter || []).filter((d) => d.kvittering_kraeves && !d.kvitteret_tid).length;
     const ventendeHb = (kvit.liste || []).filter((h) => !h.kvitteret_tid).length;
+    const ventendeRef = (musData.mus || []).filter((m) => m.referat_status === "sendt").length;
     const punkter = [
-      ["forside", "Forside", "hjem", 0], ["ferie", "Ferie og fri", "sol", 0], ["udvikling", "Udvikling", "traeplante", 0],
+      ["forside", "Forside", "hjem", 0], ["ferie", "Ferie og fri", "sol", 0], ["udvikling", "Udvikling", "traeplante", ventendeRef],
       ["dokumenter", "Dokumenter", "mappe", ventendeDok], ["haandbog", "Håndbog", "bog", ventendeHb], ["mig", "Mig", "person", 0],
     ];
     const gitter = side === "forside" || side === "udvikling";
