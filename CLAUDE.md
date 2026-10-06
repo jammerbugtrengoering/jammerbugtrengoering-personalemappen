@@ -12,7 +12,7 @@ Den lange baggrund ligger i `Planning-App/overdragelse/STATUS-2026-10-03.md` (6.
 - **Dokumenter er skjult som standard** (`synlig_for_medarbejder`). En kontrakt indeholder ofte et CPR-nummer.
 - **Filer hentes med `createSignedUrl`.** Storage-politikken `medarbejder_dokumenter_laes_eget` tillader kun egne, synlige filer. Fanen åbnes FØR opslaget (`aabnDokument`),
   ellers blokerer iPhone den som pop-up.
-- **Byg aldrig uden `.env`** (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`). Mangler de, bygger Vite alligevel og siger grønt. Bundlen er cirka 410 kB.
+- **Byg aldrig uden `.env`** (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`). Mangler de, bygger Vite alligevel og siger grønt. Bundlen er cirka 410 kB. Filen er committet med de offentlige værdier, som i Worklist, så Netlify ikke skal have variabler; en variabel i Netlify vinder over filen.
 - Skrift: venstrestillet, linjeafstand mindst 1,5, ingen ord med store bogstaver (ordblinde medarbejdere), 16 px i felter. Som Worklist.
 - Skal virke på både Android og iOS (se Worklists CLAUDE.md): sikker zone nederst (`env(safe-area-inset-bottom)`), ingen emoji i knapper.
 - Hjælp og privatlivstekst skal opdateres, når funktionalitet ændres. Teksten under «Mig» siger, hvem der kan se hvad.

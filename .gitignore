@@ -1,4 +1,6 @@
 node_modules
 dist
-.env
+# .env er bevidst committet, som i Worklist: URL og publishable key står alligevel i den byggede JavaScript, og den rigtige grænse er RLS.
+.env.local
+.env.*.local
 *.log
