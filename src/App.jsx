@@ -717,6 +717,26 @@ function Mere({ gaaTil }) {
   );
 }
 
+// Bred skærm (computer): navigationen står i en menu til venstre og indholdet er bredere, som mockuppen af HR-siden. På en telefon er det bundmenuen.
+const BRED_GRAENSE = 900;
+function useBred() {
+  const [bred, setBred] = useState(() => typeof window !== "undefined" && window.matchMedia(`(min-width: ${BRED_GRAENSE}px)`).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(`(min-width: ${BRED_GRAENSE}px)`);
+    const aendr = () => setBred(mq.matches);
+    mq.addEventListener("change", aendr);
+    return () => mq.removeEventListener("change", aendr);
+  }, []);
+  return bred;
+}
+
+// På bred skærm lægges kortene på forsiden og i Udvikling i to kolonner; overskriften står over begge. De øvrige sider (dokumenter, håndbog, ferie, mig) står i
+// én kolonne, fordi de læses som tekst eller lister.
+const BRED_CSS = `
+.pm-gitter { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.pm-gitter > :first-child { grid-column: 1 / -1; }
+`;
+
 // ── Skal ────────────────────────────────────────────────────────────────────
 function Skal({ session }) {
   const [side, setSide] = useState("forside");
@@ -739,6 +759,7 @@ function Skal({ session }) {
     return () => { afbrudt = true; };
   }, [session.user.id]);
 
+  const bred = useBred();
   // «Mere» er også valgt, når man står på en af siderne under den (håndbog, mig).
   const fane = (k, tekst, ikon, under = []) => {
     const valgt = side === k || under.includes(side);
@@ -751,18 +772,64 @@ function Skal({ session }) {
     );
   };
 
+  const indhold = adgangFejl ? <div style={s.kort}>{adgangFejl}</div>
+    : side === "forside" ? <Forside navn={navn} dok={dok} kvit={kvit} datoer={datoer} gaaTil={setSide} />
+    : side === "dokumenter" ? <DokumenterSide dok={dok} />
+    : side === "ferie" ? <FerieSide />
+    : side === "udvikling" ? <UdviklingSide dok={dok} />
+    : side === "mere" ? <Mere gaaTil={setSide} />
+    : side === "haandbog" ? <HaandbogSide kvit={kvit} />
+    : <Mig navn={navn} datoer={datoer} onLogUd={() => supabase.auth.signOut()} />;
+
+  if (bred) {
+    // Antal, der venter på hende, vises som et tal ved menupunktet (som «Påmindelser» i mockuppen).
+    const ventendeDok = (dok.dokumenter || []).filter((d) => d.kvittering_kraeves && !d.kvitteret_tid).length;
+    const ventendeHb = (kvit.liste || []).filter((h) => !h.kvitteret_tid).length;
+    const punkter = [
+      ["forside", "Forside", "hjem", 0], ["ferie", "Ferie og fri", "sol", 0], ["udvikling", "Udvikling", "traeplante", 0],
+      ["dokumenter", "Dokumenter", "mappe", ventendeDok], ["haandbog", "Håndbog", "bog", ventendeHb], ["mig", "Mig", "person", 0],
+    ];
+    const gitter = side === "forside" || side === "udvikling";
+    return (
+      <div style={{ ...s.side, maxWidth: "none", margin: 0, flexDirection: "row" }}>
+        <style>{BRED_CSS}</style>
+        <nav aria-label="Menu" style={{ width: 240, flexShrink: 0, background: "#fff", borderRight: `1px solid ${RAMME}`, padding: "24px 14px", display: "flex", flexDirection: "column", gap: 6,
+                                       position: "sticky", top: 0, height: "100dvh", boxSizing: "border-box" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 8px 18px" }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: FARVE, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Ikon navn="mappe" farve="#fff" stoerrelse={20} />
+            </div>
+            <div><div style={{ fontWeight: 700, fontSize: 17, lineHeight: 1.1 }}>Personalemappen</div><div style={{ fontSize: 13, color: DAEMPET }}>Jammerbugt Rengøring</div></div>
+          </div>
+          {punkter.map(([k, tekst, ikon, antal]) => (
+            <button key={k} type="button" onClick={() => { setSide(k); window.scrollTo(0, 0); }} aria-current={side === k ? "page" : undefined}
+              style={{ display: "flex", alignItems: "center", gap: 10, minHeight: 44, padding: "0 12px", border: "none", borderRadius: 10, textAlign: "left", cursor: "pointer",
+                       background: side === k ? FARVE_LYS : "transparent", color: side === k ? FARVE_MOERK : "#475467", fontWeight: side === k ? 700 : 400, fontSize: 16, fontFamily: "inherit" }}>
+              <Ikon navn={ikon} farve={side === k ? FARVE_MOERK : DAEMPET} stoerrelse={20} />
+              <span style={{ flex: 1 }}>{tekst}</span>
+              {antal > 0 && <span style={{ background: "#FEF3C7", color: "#92400E", fontWeight: 700, fontSize: 13, borderRadius: 999, padding: "1px 9px" }}>{antal}</span>}
+            </button>
+          ))}
+          <div style={{ flex: 1 }} />
+          <a href={WORKLIST_URL} target="_blank" rel="noreferrer" style={{ display: "flex", alignItems: "center", gap: 10, minHeight: 44, padding: "0 12px", borderRadius: 10, color: "#475467", textDecoration: "none", fontSize: 16 }}>
+            <Ikon navn="flueben" farve={DAEMPET} stoerrelse={20} />Åbn Worklist
+          </a>
+          <button type="button" onClick={() => supabase.auth.signOut()}
+            style={{ display: "flex", alignItems: "center", minHeight: 44, padding: "0 12px", border: "none", borderRadius: 10, background: "transparent", color: "#475467", fontSize: 16, fontFamily: "inherit", cursor: "pointer", textAlign: "left" }}>
+            Log ud
+          </button>
+        </nav>
+        <main className={gitter ? "pm-gitter" : undefined}
+          style={{ flex: 1, minWidth: 0, padding: "32px 36px 60px", maxWidth: gitter ? 1000 : 780, boxSizing: "border-box", ...(gitter ? {} : { display: "flex", flexDirection: "column", gap: 14 }) }}>
+          {indhold}
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div style={s.side}>
-      <div style={s.indhold}>
-        {adgangFejl ? <div style={s.kort}>{adgangFejl}</div>
-          : side === "forside" ? <Forside navn={navn} dok={dok} kvit={kvit} datoer={datoer} gaaTil={setSide} />
-          : side === "dokumenter" ? <DokumenterSide dok={dok} />
-          : side === "ferie" ? <FerieSide />
-          : side === "udvikling" ? <UdviklingSide dok={dok} />
-          : side === "mere" ? <Mere gaaTil={setSide} />
-          : side === "haandbog" ? <HaandbogSide kvit={kvit} />
-          : <Mig navn={navn} datoer={datoer} onLogUd={() => supabase.auth.signOut()} />}
-      </div>
+      <div style={s.indhold}>{indhold}</div>
       <nav style={{ position: "fixed", left: 0, right: 0, bottom: 0, maxWidth: 560, margin: "0 auto", display: "flex", background: "#fff", borderTop: `1px solid ${RAMME}`,
                     paddingBottom: "env(safe-area-inset-bottom)" }}>
         {fane("forside", "Forside", "hjem")}
