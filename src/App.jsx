@@ -219,9 +219,10 @@ function DokumenterSide({ dok }) {
 }
 
 // ── Forside ─────────────────────────────────────────────────────────────────
-function Forside({ navn, dok, datoer, gaaTil }) {
+function Forside({ navn, dok, kvit, datoer, gaaTil }) {
   const fornavn = (navn || "").split(" ")[0];
   const venter = (dok.dokumenter || []).filter((d) => d.kvittering_kraeves && !d.kvitteret_tid);
+  const haandbogVenter = (kvit.liste || []).filter((h) => !h.kvitteret_tid);
   const snart = new Date(Date.now() + 120 * 864e5).toISOString().slice(0, 10);
   const naeste = [];
   if (datoer?.mus_naeste && datoer.mus_naeste >= idagIso()) naeste.push({ tekst: "Medarbejdersamtale (MUS)", dato: datoer.mus_naeste, advarsel: false });
@@ -237,16 +238,22 @@ function Forside({ navn, dok, datoer, gaaTil }) {
       <div style={s.kort}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={s.h2}>Venter på dig</div>
-          {venter.length > 0 && <div style={{ background: FARVE_LYS, color: FARVE_MOERK, fontWeight: 700, fontSize: 13.5, borderRadius: 999, padding: "2px 10px" }}>{venter.length} {venter.length === 1 ? "ny" : "nye"}</div>}
+          {venter.length + haandbogVenter.length > 0 && <div style={{ background: FARVE_LYS, color: FARVE_MOERK, fontWeight: 700, fontSize: 13.5, borderRadius: 999, padding: "2px 10px" }}>{venter.length + haandbogVenter.length} {venter.length + haandbogVenter.length === 1 ? "ny" : "nye"}</div>}
         </div>
-        {venter.length === 0
+        {venter.length + haandbogVenter.length === 0
           ? <div style={{ ...s.dempet, marginTop: 8 }}>Der er ikke noget, du skal kvittere for.</div>
-          : venter.map((d) => (
+          : <>{haandbogVenter.map((h) => (
+            <div key={h.dokument_id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderTop: `1px solid ${RAMME}`, marginTop: 8 }}>
+              <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600, wordBreak: "break-word" }}>{h.titel}</div><div style={s.dempet}>Skal læses og kvitteres{h.version > 1 ? " (ny version)" : ""}</div></div>
+              <button type="button" style={s.knap} onClick={() => gaaTil("haandbog")}>Åbn</button>
+            </div>
+          ))}
+          {venter.map((d) => (
             <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderTop: `1px solid ${RAMME}`, marginTop: 8 }}>
               <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600, wordBreak: "break-word" }}>{d.titel}</div><div style={s.dempet}>Lagt ind {kortDato(d.uploadet_at)}</div></div>
               <button type="button" style={s.knap} onClick={() => gaaTil("dokumenter")}>Åbn</button>
             </div>
-          ))}
+          ))}</>}
       </div>
 
       {naeste.length > 0 && (
@@ -355,11 +362,24 @@ function Mig({ navn, datoer, onLogUd }) {
   );
 }
 
+// Håndbogsdokumenter, hun skal kvittere for, og om hun har kvitteret for den nuværende version (mine_haandbog_kvittering). En ny version kræver en ny kvittering.
+function useHaandbogKvittering() {
+  const [liste, setListe] = useState(null);
+  const hent = useCallback(async () => {
+    const { data } = await supabase.rpc("mine_haandbog_kvittering");
+    setListe(data || []);
+  }, []);
+  useEffect(() => { hent(); }, [hent]);
+  return { liste, hent };
+}
+
 // ── Håndbog ─────────────────────────────────────────────────────────────────
 // Personalehåndbogen og politikkerne står i databasen (haandbog_dokumenter / haandbog_afsnit), og HR retter dem i planlægningsappen. Alle medarbejdere kan læse.
 // Teksten vises, som den er skrevet: linjeskift bevares (white-space: pre-line), og intet tolkes som HTML.
-function HaandbogSide() {
+function HaandbogSide({ kvit }) {
   const [dokumenter, setDokumenter] = useState(null);
+  const [kvitFejl, setKvitFejl] = useState("");
+  const [kvitterer, setKvitterer] = useState("");
   const [aaben, setAaben] = useState(null);
   const [fejl, setFejl] = useState("");
 
@@ -379,14 +399,24 @@ function HaandbogSide() {
     return () => { afbrudt = true; };
   }, []);
 
+  async function kvitter(id) {
+    setKvitterer(id); setKvitFejl("");
+    const { error } = await supabase.rpc("kvitter_haandbog", { p_dokument_id: id });
+    setKvitterer("");
+    if (error) { setKvitFejl("Kvitteringen kunne ikke gemmes: " + error.message); return; }
+    kvit.hent();
+  }
+
   return (
     <>
       <div><h1 style={s.h1}>Håndbog</h1>
         <div style={s.dempet}>Det, vi har aftalt hos Jammerbugt Rengøring. Tryk på et dokument for at læse det.</div></div>
-      {fejl && <div style={s.fejl}>{fejl}</div>}
+      {(fejl || kvitFejl) && <div style={s.fejl}>{fejl || kvitFejl}</div>}
       {dokumenter === null && <div style={s.dempet}>Henter…</div>}
       {(dokumenter || []).map((dok) => {
         const er = aaben === dok.id;
+        const k = (kvit.liste || []).find((x) => x.dokument_id === dok.id);
+        const skalKvitteres = !!k && !k.kvitteret_tid;
         return (
           <div key={dok.id} style={s.kort}>
             <button type="button" onClick={() => setAaben(er ? null : dok.id)} aria-expanded={er}
@@ -397,6 +427,8 @@ function HaandbogSide() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 700, fontSize: 17 }}>{dok.titel}</div>
                 <div style={s.dempet}>Sidst rettet {kortDato(dok.opdateret)}</div>
+                {skalKvitteres && <div style={{ color: FARVE_MOERK, fontWeight: 700, fontSize: 14 }}>Skal kvitteres</div>}
+                {k && k.kvitteret_tid && <div style={{ color: "#1B7A46", fontWeight: 700, fontSize: 14 }}>Kvitteret {kortDato(k.kvitteret_tid)}</div>}
               </div>
               <span style={{ color: DAEMPET, fontSize: 22, fontWeight: 700 }} aria-hidden="true">{er ? "−" : "+"}</span>
             </button>
@@ -409,6 +441,11 @@ function HaandbogSide() {
                   </div>
                 ))}
                 {dok.underskrift && <div style={{ ...s.dempet, borderTop: `1px solid ${RAMME}`, paddingTop: 10 }}>{dok.underskrift}</div>}
+                {skalKvitteres && (
+                  <button type="button" style={{ ...s.knap, minHeight: 52 }} disabled={kvitterer === dok.id} onClick={() => kvitter(dok.id)}>
+                    {kvitterer === dok.id ? "Gemmer…" : "Jeg har læst det"}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -687,6 +724,7 @@ function Skal({ session }) {
   const [datoer, setDatoer] = useState(null);
   const [adgangFejl, setAdgangFejl] = useState("");
   const dok = useDokumenter();
+  const kvit = useHaandbogKvittering();
 
   useEffect(() => {
     let afbrudt = false;
@@ -717,12 +755,12 @@ function Skal({ session }) {
     <div style={s.side}>
       <div style={s.indhold}>
         {adgangFejl ? <div style={s.kort}>{adgangFejl}</div>
-          : side === "forside" ? <Forside navn={navn} dok={dok} datoer={datoer} gaaTil={setSide} />
+          : side === "forside" ? <Forside navn={navn} dok={dok} kvit={kvit} datoer={datoer} gaaTil={setSide} />
           : side === "dokumenter" ? <DokumenterSide dok={dok} />
           : side === "ferie" ? <FerieSide />
           : side === "udvikling" ? <UdviklingSide dok={dok} />
           : side === "mere" ? <Mere gaaTil={setSide} />
-          : side === "haandbog" ? <HaandbogSide />
+          : side === "haandbog" ? <HaandbogSide kvit={kvit} />
           : <Mig navn={navn} datoer={datoer} onLogUd={() => supabase.auth.signOut()} />}
       </div>
       <nav style={{ position: "fixed", left: 0, right: 0, bottom: 0, maxWidth: 560, margin: "0 auto", display: "flex", background: "#fff", borderTop: `1px solid ${RAMME}`,
