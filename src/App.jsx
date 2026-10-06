@@ -49,6 +49,7 @@ function Ikon({ navn, farve = DAEMPET, stoerrelse = 24 }) {
     mappe: <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />,
     person: <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>,
     fil: <><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /></>,
+    bog: <><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z" /><path d="M4 21V5M8 7h7M8 11h7" /></>,
     kalender: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></>,
     flueben: <path d="M5 12l5 5 9-10" />,
   };
@@ -330,6 +331,69 @@ function Mig({ navn, datoer, onLogUd }) {
   );
 }
 
+// ── Håndbog ─────────────────────────────────────────────────────────────────
+// Personalehåndbogen og politikkerne står i databasen (haandbog_dokumenter / haandbog_afsnit), og HR retter dem i planlægningsappen. Alle medarbejdere kan læse.
+// Teksten vises, som den er skrevet: linjeskift bevares (white-space: pre-line), og intet tolkes som HTML.
+function HaandbogSide() {
+  const [dokumenter, setDokumenter] = useState(null);
+  const [aaben, setAaben] = useState(null);
+  const [fejl, setFejl] = useState("");
+
+  useEffect(() => {
+    let afbrudt = false;
+    (async () => {
+      const [{ data: d, error: e1 }, { data: a, error: e2 }] = await Promise.all([
+        supabase.from("haandbog_dokumenter").select("*").order("raekkefoelge"),
+        supabase.from("haandbog_afsnit").select("*").order("raekkefoelge"),
+      ]);
+      if (afbrudt) return;
+      if (e1 || e2) { setFejl("Håndbogen kunne ikke hentes: " + (e1 || e2).message); setDokumenter([]); return; }
+      const liste = (d || []).map((x) => ({ ...x, afsnit: (a || []).filter((y) => y.dokument_id === x.id) }));
+      setDokumenter(liste);
+      if (liste.length === 1) setAaben(liste[0].id);
+    })();
+    return () => { afbrudt = true; };
+  }, []);
+
+  return (
+    <>
+      <div><h1 style={s.h1}>Håndbog</h1>
+        <div style={s.dempet}>Det, vi har aftalt hos Jammerbugt Rengøring. Tryk på et dokument for at læse det.</div></div>
+      {fejl && <div style={s.fejl}>{fejl}</div>}
+      {dokumenter === null && <div style={s.dempet}>Henter…</div>}
+      {(dokumenter || []).map((dok) => {
+        const er = aaben === dok.id;
+        return (
+          <div key={dok.id} style={s.kort}>
+            <button type="button" onClick={() => setAaben(er ? null : dok.id)} aria-expanded={er}
+              style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", minHeight: 48, border: "none", background: "transparent", padding: 0, textAlign: "left", fontFamily: "inherit", color: TEKST, cursor: "pointer" }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: FARVE_LYS, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Ikon navn="bog" farve={FARVE_MOERK} stoerrelse={20} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 17 }}>{dok.titel}</div>
+                <div style={s.dempet}>Sidst rettet {kortDato(dok.opdateret)}</div>
+              </div>
+              <span style={{ color: DAEMPET, fontSize: 22, fontWeight: 700 }} aria-hidden="true">{er ? "−" : "+"}</span>
+            </button>
+            {er && (
+              <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 16 }}>
+                {dok.afsnit.map((a) => (
+                  <div key={a.id}>
+                    {a.overskrift && <div style={{ fontWeight: 700, marginBottom: 4 }}>{a.overskrift}</div>}
+                    <div style={{ whiteSpace: "pre-line", overflowWrap: "anywhere" }}>{a.tekst}</div>
+                  </div>
+                ))}
+                {dok.underskrift && <div style={{ ...s.dempet, borderTop: `1px solid ${RAMME}`, paddingTop: 10 }}>{dok.underskrift}</div>}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
 // ── Skal ────────────────────────────────────────────────────────────────────
 function Skal({ session }) {
   const [side, setSide] = useState("forside");
@@ -365,12 +429,14 @@ function Skal({ session }) {
         {adgangFejl ? <div style={s.kort}>{adgangFejl}</div>
           : side === "forside" ? <Forside navn={navn} dok={dok} datoer={datoer} gaaTil={setSide} />
           : side === "dokumenter" ? <DokumenterSide dok={dok} />
+          : side === "haandbog" ? <HaandbogSide />
           : <Mig navn={navn} datoer={datoer} onLogUd={() => supabase.auth.signOut()} />}
       </div>
       <nav style={{ position: "fixed", left: 0, right: 0, bottom: 0, maxWidth: 560, margin: "0 auto", display: "flex", background: "#fff", borderTop: `1px solid ${RAMME}`,
                     paddingBottom: "env(safe-area-inset-bottom)" }}>
         {fane("forside", "Forside", "hjem")}
         {fane("dokumenter", "Dokumenter", "mappe")}
+        {fane("haandbog", "Håndbog", "bog")}
         {fane("mig", "Mig", "person")}
       </nav>
     </div>
