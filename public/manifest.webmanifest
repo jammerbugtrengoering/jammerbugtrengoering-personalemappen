@@ -1,0 +1,14 @@
+{
+  "name": "Personalemappen",
+  "short_name": "Personalemappen",
+  "description": "Dine dokumenter og oplysninger hos Jammerbugt Rengøring",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFF7FA",
+  "theme_color": "#D6247A",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/app-icon.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/app-icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

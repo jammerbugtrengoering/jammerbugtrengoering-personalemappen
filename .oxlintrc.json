@@ -1,0 +1,33 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "react",
+    "oxc"
+  ],
+  "env": {
+    "browser": true,
+    "es2024": true
+  },
+  "ignorePatterns": [
+    "dist/**",
+    "supabase/**",
+    "netlify/**",
+    "tjek-tdz.mjs",
+    "ugespring.test.mjs",
+    "tidsfelt.test.mjs",
+    "startstop.test.mjs"
+  ],
+  "rules": {
+    "no-undef": "error",
+    "react/rules-of-hooks": "error",
+    "react/only-export-components": [
+      "warn",
+      {
+        "allowConstantExport": true
+      }
+    ]
+  },
+  "globals": {
+    "__BYGGET__": "readonly"
+  }
+}
