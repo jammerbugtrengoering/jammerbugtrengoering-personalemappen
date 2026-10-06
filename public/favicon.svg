@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Personalemappen">
+  <rect width="512" height="512" rx="112" fill="#D6247A"/>
+  <!-- mappens bagside med flig -->
+  <path d="M96 176a28 28 0 0 1 28-28h86a20 20 0 0 1 15 7l30 34h137a28 28 0 0 1 28 28v155a28 28 0 0 1-28 28H124a28 28 0 0 1-28-28z" fill="#fff" fill-opacity="0.55"/>
+  <!-- mappens forside -->
+  <rect x="88" y="216" width="336" height="192" rx="30" fill="#fff"/>
+  <!-- personen -->
+  <circle cx="256" cy="278" r="36" fill="#D6247A"/>
+  <path d="M184 386c0-44 32-70 72-70s72 26 72 70z" fill="#D6247A"/>
+</svg>
