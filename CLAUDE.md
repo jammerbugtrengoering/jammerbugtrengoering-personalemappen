@@ -6,8 +6,9 @@ Den lange baggrund ligger i `Planning-App/overdragelse/STATUS-2026-10-03.md` (6.
 
 ## Regler, der koster tid at lære
 
-- **Appen læser aldrig `employee_hr` eller `employee_dokumenter` direkte.** De er kun for HR-administratorer (`er_hr_admin()`). Alt går gennem
-  `mine_dokumenter`, `kvitter_dokument`, `mine_datoer`, `hent_mine_kontaktoplysninger`, `opdater_mine_kontaktoplysninger`. Skal der vises noget nyt,
+- **Appen læser aldrig `employee_hr`, `employee_dokumenter` eller `mus_samtaler` direkte.** De er kun for HR-administratorer (`er_hr_admin()`); `mus_samtaler` har slet ingen direkte adgang, fordi forberedelsen er hendes egen, til hun deler den. Alt går gennem
+  `mine_dokumenter`, `kvitter_dokument`, `mine_datoer`, `hent_mine_kontaktoplysninger`, `opdater_mine_kontaktoplysninger`, `anmod_fravaer`, `traek_fravaer`, `mine_fravaer`, `min_mus`, `gem_mus_forberedelse`, `mine_kompetencer`, `mine_udviklingsoensker`, `tilfoej_udviklingsoenske`, `traek_udviklingsoenske`. Håndbogen læses direkte (`haandbog_dokumenter`, `haandbog_afsnit`; alle medarbejdere må læse).
+- **MUS-spørgsmålene (`MUS_SPOERGSMAAL`) står også i planlægningsappen.** Svarene gemmes under q1-q5; ændres spørgsmålene, skal begge steder ændres. Skal der vises noget nyt,
   laves en ny funktion, der kun giver medarbejderen det, der er hendes OG gjort synligt — ikke en ny læsepolitik.
 - **Dokumenter er skjult som standard** (`synlig_for_medarbejder`). En kontrakt indeholder ofte et CPR-nummer.
 - **Filer hentes med `createSignedUrl`.** Storage-politikken `medarbejder_dokumenter_laes_eget` tillader kun egne, synlige filer. Fanen åbnes FØR opslaget (`aabnDokument`),
@@ -25,4 +26,4 @@ Den lange baggrund ligger i `Planning-App/overdragelse/STATUS-2026-10-03.md` (6.
 ## Åbne punkter (6.10.2026)
 
 Ingen service worker og ingen push endnu. Ingen sprogvalg (kun dansk). Nulstilling af adgangskode sker i Worklist. Påmindelser til kontoret
-(ikke kvitteret efter N dage, certifikater der udløber) og opbevaringsfrister er ikke bygget.
+og opbevaringsfrister er ikke bygget. Push-besked til medarbejderen, når en ferieanmodning er afgjort, er ikke bygget (svaret står i appen).
