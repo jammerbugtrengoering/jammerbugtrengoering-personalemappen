@@ -11,6 +11,8 @@ import { supabase } from "./supabaseClient";
 // og 16 px i felter, ellers zoomer iPhone ind på dem.
 
 const DOK_BUCKET = "medarbejder-dokumenter";
+// Medarbejderens opgave-app (eget Netlify-site). Linket står under «Mere».
+const WORKLIST_URL = import.meta.env.VITE_WORKLIST_URL || "https://jammerbugtrengoering-service.netlify.app/";
 const FARVE = "#D6247A";
 const FARVE_LYS = "#FCE7F1";
 const FARVE_MOERK = "#A81A5F";
@@ -667,6 +669,13 @@ function Mere({ gaaTil }) {
       <div><h1 style={s.h1}>Mere</h1></div>
       {raekke("haandbog", "Håndbog", "Personalehåndbog og rygepolitik", "bog")}
       {raekke("mig", "Mig", "Telefon, nødkontakt og log ud", "person")}
+      <a href={WORKLIST_URL} target="_blank" rel="noreferrer"
+        style={{ ...s.kort, display: "flex", gap: 12, alignItems: "center", textDecoration: "none", color: TEKST, minHeight: 64 }}>
+        <div style={{ width: 40, height: 40, borderRadius: 10, background: "#F4EEF1", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <Ikon navn="flueben" farve={DAEMPET} stoerrelse={20} />
+        </div>
+        <div style={{ flex: 1 }}><div style={{ fontWeight: 700 }}>Åbn Worklist</div><div style={s.dempet}>Dine opgaver og din tid</div></div>
+      </a>
     </>
   );
 }
