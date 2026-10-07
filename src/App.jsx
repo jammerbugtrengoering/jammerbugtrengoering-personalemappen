@@ -489,6 +489,12 @@ function FerieSide() {
   const [fejl, setFejl] = useState("");
   const [sender, setSender] = useState(false);
   const [sendt, setSendt] = useState(false);
+  // Varslet saettes af kontoret (planlaegningsappen, Ferie og fravaer) og laeses her, saa advarslen og kontorets «kort varsel» er enige.
+  const [varsel, setVarsel] = useState({ ferie: 28, fridag: 10 });
+  useEffect(() => {
+    supabase.rpc("fravaer_varsel").then(({ data }) => { const v = Array.isArray(data) ? data[0] : data; if (v) setVarsel({ ferie: v.ferie, fridag: v.fridag }); });
+  }, []);
+  const varselTekst = (d) => (d >= 7 && d % 7 === 0 ? `${d / 7} ${d === 7 ? "uge" : "uger"}` : `${d} ${d === 1 ? "dag" : "dage"}`);
 
   const hent = useCallback(async () => {
     const { data, error } = await supabase.rpc("mine_fravaer");
@@ -498,7 +504,7 @@ function FerieSide() {
   useEffect(() => { hent(); }, [hent]);
 
   const tilEff = art === "fridag" && !til ? fra : til;
-  const grænse = art === "ferie" ? 28 : 10;
+  const grænse = art === "ferie" ? varsel.ferie : varsel.fridag;
   const kortVarsel = fra && fra < new Date(Date.now() + grænse * 864e5).toISOString().slice(0, 10);
   const gyldig = fra && tilEff && tilEff >= fra && fra >= idagIso();
 
@@ -537,10 +543,10 @@ function FerieSide() {
         <input id="til" type="date" min={fra || idagIso()} style={s.felt} value={til} onChange={(e) => setTil(e.target.value)} />
         <label htmlFor="note" style={s.label}>Bemærkning (valgfri)</label>
         <textarea id="note" rows={2} style={{ ...s.felt, minHeight: 64, padding: 10, lineHeight: 1.5 }} value={note} onChange={(e) => setNote(e.target.value)} />
-        <div style={s.dempet}>Skriv ikke noget om helbred.</div>
+        <div style={s.dempet}>Ferie skal søges mindst {varselTekst(varsel.ferie)} før, fri mindst {varselTekst(varsel.fridag)} før. Skriv ikke noget om helbred.</div>
         {kortVarsel && (
           <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 10, background: "#FEF3C7", color: "#92400E", fontSize: 14.5, lineHeight: 1.5 }}>
-            Det er kort varsel. Aftalen er mindst {art === "ferie" ? "4 uger" : "10 dage"} før. Du kan stadig sende, og kontoret afgør, om det kan lade sig gøre.
+            Det er kort varsel. Det skal aftales mindst {varselTekst(grænse)} før. Du kan stadig sende, og kontoret afgør, om det kan lade sig gøre.
           </div>
         )}
         {fejl && <div style={s.fejl}>{fejl}</div>}
