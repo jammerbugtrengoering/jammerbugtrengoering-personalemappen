@@ -409,7 +409,8 @@ function HaandbogSide({ kvit }) {
     let afbrudt = false;
     (async () => {
       const [{ data: d, error: e1 }, { data: a, error: e2 }] = await Promise.all([
-        supabase.from("haandbog_dokumenter").select("*").order("raekkefoelge"),
+        // Kun aktive (7.10.2026). Politikken skjuler kladder og udgaaede for medarbejdere, men en HR-administrator faar ogsaa laese alt som HR — og skal her se det, som alle andre ser.
+        supabase.from("haandbog_dokumenter").select("*").eq("status", "aktiv").order("raekkefoelge"),
         supabase.from("haandbog_afsnit").select("*").order("raekkefoelge"),
       ]);
       if (afbrudt) return;

@@ -25,6 +25,8 @@ Den lange baggrund ligger i `Planning-App/overdragelse/STATUS-2026-10-03.md` (6.
 - **Referatet (MUS)** skrives i Worklist af lederen; her kan medarbejderen kun godkende eller sende en bemærkning. Hun kan aldrig gemme eller sende et referat — databasen afviser det. Tilføj ikke skrivefelter til referatet her.
 - Nye personoplysninger → ret «Sådan behandler vi dine oplysninger» under Mig og `persondata_register`.
 
+- **Håndbogen: kun `status = 'aktiv'` (kladder og udgåede ses kun i planlægningsappen).** Appen filtrerer selv med `.eq("status", "aktiv")`, fordi en HR-administrator, der åbner appen, ellers også ser kladder og udgåede gennem HR-læsepolitikken. Ny læsning af `haandbog_dokumenter` skal gøre det samme.
+
 ## Før du melder noget færdigt
 
     npm run build
