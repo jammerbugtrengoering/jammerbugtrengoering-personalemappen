@@ -777,7 +777,7 @@ function UdviklingSide({ dok, musData }) {
   );
 }
 
-// ── Mere: håndbog og mig ────────────────────────────────────────────────────
+// ── Mere: dokumenter og mig (håndbogen har sin egen fane i bundlinjen, 7.10.2026) ────────────────────────────────────────────────────
 function Mere({ gaaTil }) {
   const raekke = (side, titel, tekst, ikon) => (
     <button type="button" onClick={() => gaaTil(side)}
@@ -791,7 +791,7 @@ function Mere({ gaaTil }) {
   return (
     <>
       <div><h1 style={s.h1}>Mere</h1></div>
-      {raekke("haandbog", "Håndbog", "Personalehåndbog og rygepolitik", "bog")}
+      {raekke("dokumenter", "Dokumenter", "Kontrakt og andre dokumenter fra kontoret", "mappe")}
       {raekke("mig", "Mig", "Telefon, nødkontakt og log ud", "person")}
       <a href={WORKLIST_URL} target="_blank" rel="noreferrer"
         style={{ ...s.kort, display: "flex", gap: 12, alignItems: "center", textDecoration: "none", color: TEKST, minHeight: 64 }}>
@@ -848,14 +848,20 @@ function Skal({ session }) {
   }, [session.user.id]);
 
   const bred = useBred();
-  // «Mere» er også valgt, når man står på en af siderne under den (håndbog, mig).
-  const fane = (k, tekst, ikon, under = []) => {
+  const ventendeDokAlle = (dok.dokumenter || []).filter((d) => d.kvittering_kraeves && !d.kvitteret_tid).length;
+  const ventendeHbAlle = (kvit.liste || []).filter((h) => !h.kvitteret_tid).length;
+  // «Mere» er også valgt, når man står på en af siderne under den (dokumenter, mig). Et tal på fanen viser, hvor mange ting der venter på en kvittering.
+  const fane = (k, tekst, ikon, under = [], antal = 0) => {
     const valgt = side === k || under.includes(side);
     return (
     <button type="button" onClick={() => { setSide(k); window.scrollTo(0, 0); }} aria-current={valgt ? "page" : undefined}
       style={{ flex: 1, minHeight: 56, border: "none", background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
                fontFamily: "inherit", fontSize: 13.5, fontWeight: valgt ? 700 : 400, color: valgt ? FARVE : DAEMPET, cursor: "pointer" }}>
-      <Ikon navn={ikon} farve={valgt ? FARVE : DAEMPET} />{tekst}
+      <span style={{ position: "relative", display: "inline-flex" }}>
+        <Ikon navn={ikon} farve={valgt ? FARVE : DAEMPET} />
+        {antal > 0 && <span aria-label={`${antal} venter`} style={{ position: "absolute", top: -4, right: -10, minWidth: 18, height: 18, padding: "0 5px", boxSizing: "border-box", borderRadius: 999, background: "#F59E0B", color: "#fff", fontSize: 12, fontWeight: 700, lineHeight: "18px", textAlign: "center" }}>{antal}</span>}
+      </span>
+      {tekst}
     </button>
     );
   };
@@ -924,8 +930,8 @@ function Skal({ session }) {
         {fane("forside", "Forside", "hjem")}
         {fane("ferie", "Ferie", "sol")}
         {fane("udvikling", "Udvikling", "traeplante")}
-        {fane("dokumenter", "Dokumenter", "mappe")}
-        {fane("mere", "Mere", "mere", ["haandbog", "mig"])}
+        {fane("haandbog", "Håndbog", "bog", [], ventendeHbAlle)}
+        {fane("mere", "Mere", "mere", ["dokumenter", "mig"], ventendeDokAlle)}
       </nav>
     </div>
   );
