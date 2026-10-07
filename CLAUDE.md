@@ -21,6 +21,10 @@ Den lange baggrund ligger i `Planning-App/overdragelse/STATUS-2026-10-03.md` (6.
 - Hjælp og privatlivstekst skal opdateres, når funktionalitet ændres. Teksten under «Mig» siger, hvem der kan se hvad.
 - Commit-beskeder uden æøå. `git pull --no-rebase origin main` før push, aldrig `--force`.
 
+- **Tekster:** aldrig «hun»/«han» — skriv «du» eller «medarbejderen» (Jonns beslutning 7.10.2026). Kommentarer i koden må gerne være ældre.
+- **Referatet (MUS)** skrives i Worklist af lederen; her kan medarbejderen kun godkende eller sende en bemærkning. Hun kan aldrig gemme eller sende et referat — databasen afviser det. Tilføj ikke skrivefelter til referatet her.
+- Nye personoplysninger → ret «Sådan behandler vi dine oplysninger» under Mig og `persondata_register`.
+
 ## Før du melder noget færdigt
 
     npm run build
