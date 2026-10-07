@@ -25,6 +25,7 @@ Den lange baggrund ligger i `Planning-App/overdragelse/STATUS-2026-10-03.md` (6.
 - **Referatet (MUS)** skrives i Worklist af lederen; her kan medarbejderen kun godkende eller sende en bemærkning. Hun kan aldrig gemme eller sende et referat — databasen afviser det. Tilføj ikke skrivefelter til referatet her.
 - Nye personoplysninger → ret «Sådan behandler vi dine oplysninger» under Mig og `persondata_register`.
 
+- **Ferie og fri med kort varsel kræver en grund** (mindst 20 tegn, 7.10.2026). Appen viser en tydelig advarsel og sender først, når grunden er skrevet; `anmod_fravaer` afviser det samme i databasen, så en gammel fane ikke kan omgå det. Anmodningen afvises ikke for det korte varsel, kontoret afgør. Rettes grænsen på 20 tegn, skal appen og funktionen rettes sammen.
 - **Håndbogen: kun `status = 'aktiv'` (kladder og udgåede ses kun i planlægningsappen).** Appen filtrerer selv med `.eq("status", "aktiv")`, fordi en HR-administrator, der åbner appen, ellers også ser kladder og udgåede gennem HR-læsepolitikken. Ny læsning af `haandbog_dokumenter` skal gøre det samme.
 
 ## Før du melder noget færdigt

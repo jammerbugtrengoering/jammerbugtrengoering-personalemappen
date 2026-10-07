@@ -480,7 +480,8 @@ function HaandbogSide({ kvit }) {
 
 // ── Ferie og fri ────────────────────────────────────────────────────────────
 // Medarbejderen anmoder, kontoret godkender i planlægningsappen, og svaret står her. Håndbogen siger: ferie mindst 4 uger før, fri mindst 10 dage før.
-// Kort varsel afvises ikke af appen eller databasen; anmodningen flagges for kontoret, som afgør det. Sygdom er ikke en anmodning og meldes på telefonen.
+// Kort varsel afvises ikke, men kræver en gyldig og fyldestgørende grund (mindst 20 tegn, 7.10.2026): appen viser en tydelig advarsel og sender først, når grunden er skrevet,
+// og databasen (anmod_fravaer) kræver det samme, så en gammel fane ikke kan omgå det. Kontoret afgør. Sygdom er ikke en anmodning og meldes på telefonen.
 function FerieSide() {
   const [liste, setListe] = useState(null);
   const [art, setArt] = useState("ferie");
@@ -507,7 +508,10 @@ function FerieSide() {
   const tilEff = art === "fridag" && !til ? fra : til;
   const grænse = art === "ferie" ? varsel.ferie : varsel.fridag;
   const kortVarsel = fra && fra < new Date(Date.now() + grænse * 864e5).toISOString().slice(0, 10);
-  const gyldig = fra && tilEff && tilEff >= fra && fra >= idagIso();
+  const MIN_GRUND = 20;
+  const grundLaengde = note.trim().length;
+  const grundMangler = !!kortVarsel && grundLaengde < MIN_GRUND;
+  const gyldig = fra && tilEff && tilEff >= fra && fra >= idagIso() && !grundMangler;
 
   async function send() {
     setSender(true); setFejl(""); setSendt(false);
@@ -542,14 +546,20 @@ function FerieSide() {
         <input id="fra" type="date" min={idagIso()} style={s.felt} value={fra} onChange={(e) => { setFra(e.target.value); setSendt(false); }} />
         <label htmlFor="til" style={s.label}>{art === "ferie" ? "Sidste feriedag" : "Til og med (hvis flere dage)"}</label>
         <input id="til" type="date" min={fra || idagIso()} style={s.felt} value={til} onChange={(e) => setTil(e.target.value)} />
-        <label htmlFor="note" style={s.label}>Bemærkning (valgfri)</label>
-        <textarea id="note" rows={2} style={{ ...s.felt, minHeight: 64, padding: 10, lineHeight: 1.5 }} value={note} onChange={(e) => setNote(e.target.value)} />
-        <div style={s.dempet}>Ferie skal søges mindst {varselTekst(varsel.ferie)} før, fri mindst {varselTekst(varsel.fridag)} før. Skriv ikke noget om helbred.</div>
         {kortVarsel && (
-          <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 10, background: "#FEF3C7", color: "#92400E", fontSize: 14.5, lineHeight: 1.5 }}>
-            Det er kort varsel. Det skal aftales mindst {varselTekst(grænse)} før. Du kan stadig sende, og kontoret afgør, om det kan lade sig gøre.
+          <div role="alert" style={{ marginTop: 12, padding: "12px 14px", borderRadius: 10, background: "#FEF3C7", color: "#92400E", fontSize: 15, lineHeight: 1.55, border: "1px solid #FCD34D" }}>
+            <b>Varslet er ikke overholdt.</b> {art === "ferie" ? "Ferie" : "Fri"} skal søges mindst {varselTekst(grænse)} før første dag. Skriv en gyldig og fyldestgørende grund til, at det ikke kan vente. Kontoret afgør, om det kan lade sig gøre.
           </div>
         )}
+        <label htmlFor="note" style={s.label}>{kortVarsel ? "Grund til kort varsel (skal udfyldes)" : "Bemærkning (valgfri)"}</label>
+        <textarea id="note" rows={kortVarsel ? 3 : 2} style={{ ...s.felt, minHeight: kortVarsel ? 90 : 64, padding: 10, lineHeight: 1.5, borderColor: grundMangler && grundLaengde > 0 ? "#D97706" : undefined }}
+          value={note} onChange={(e) => setNote(e.target.value)} aria-required={!!kortVarsel} aria-describedby="grundhjaelp" />
+        <div id="grundhjaelp" style={s.dempet}>
+          {kortVarsel
+            ? (grundMangler ? `Skriv mindst ${MIN_GRUND} tegn, så kontoret kan se, hvorfor det haster (${grundLaengde} af ${MIN_GRUND}). ` : "")
+            : ""}
+          Ferie skal søges mindst {varselTekst(varsel.ferie)} før, fri mindst {varselTekst(varsel.fridag)} før. Skriv ikke noget om helbred.
+        </div>
         {fejl && <div style={s.fejl}>{fejl}</div>}
         {sendt && <div style={{ color: "#1B7A46", fontWeight: 700, marginTop: 10 }}>Anmodningen er sendt til kontoret.</div>}
         <button type="button" disabled={!gyldig || sender} onClick={send}
